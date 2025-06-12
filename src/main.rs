@@ -1,96 +1,34 @@
+// src/main.rs
+
 use anyhow::Result;
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use std::env;
 
-use base64::{Engine as _, engine::general_purpose};
-use std::fs;
+// ประกาศให้ Rust รู้จักโมดูลที่เราสร้างขึ้น
+mod ocr_processor;
+// เราจะคอมเมนต์ส่วนนี้ไว้ก่อนตามโค้ดที่คุณให้มา แต่สามารถเปิดใช้ทีหลังได้
+// mod file_handler;
 
-// --- Structs for the Request Body ---
-// These are designed to create the exact JSON structure needed for this method.
-#[derive(Serialize)]
-struct DocumentRequest {
-    #[serde(rename = "type")]
-    doc_type: &'static str,
-    image_url: String, // We use String because we need to build the data URI
-}
-
-#[derive(Serialize)]
-struct OcrRequest {
-    model: &'static str,
-    document: DocumentRequest,
-    include_image_base64: bool,
-}
-
-// --- Structs for the Response Body ---
-#[derive(Deserialize, Debug)]
-struct Page {
-    markdown: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct OcrResponse {
-    pages: Vec<Page>,
-}
-#[derive(Debug)]
-pub enum OcrResult {
-    DeviationFound(String),
-    OccBandWithFound(String),
-    UnwantedFound(String),
-}
+// นำเข้าฟังก์ชันและ enum ที่เราจะใช้
+use ocr_processor::process_image;
+// use file_handler::handle_file_based_on_result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // โหลด .env file
     dotenvy::dotenv().ok();
-    let mistral_key =
-        env::var("MISTRAL_API_KEY").expect("MISTRAL_API_KEY environment variable not set");
 
-    let image_path = "797.png";
+    // 1. กำหนดไฟล์ที่จะประมวลผล
+    let image_path = "../855.png";
+    println!("Processing image: {}", image_path);
 
-    println!("Reading and encoding local file: '{}'...", image_path);
-    let image_bytes = fs::read(image_path)?;
-    let base64_data = general_purpose::STANDARD.encode(&image_bytes);
+    // 2. เรียกใช้โมดูล OCR เพื่อรับผลลัพธ์
+    // `.await` ใช้ได้เพราะ `process_image` เป็น `async`
+    let ocr_result = process_image(image_path).await?;
+    println!("OCR Result determined: {:?}", ocr_result);
 
-    let data_uri = format!("data:image/png;base64,{}", base64_data);
+    // คุณสามารถเพิ่มโค้ดเพื่อจัดการกับ ocr_result ตรงนี้ได้เลย
 
-    // This builds the JSON payload, just like the Python dictionary
-    let request_body = OcrRequest {
-        model: "mistral-ocr-latest",
-        document: DocumentRequest {
-            doc_type: "image_url",
-            image_url: data_uri,
-        },
-        include_image_base64: false,
-    };
+    println!("\nProcess completed successfully!");
 
-    let client = Client::new();
-
-    println!("Sending request to Mistral API...");
-
-    // This sends the request and gets the response
-    let response = client
-        .post("https://api.mistral.ai/v1/ocr")
-        .bearer_auth(&mistral_key)
-        .json(&request_body)
-        .send()
-        .await?
-        .error_for_status()?;
-
-    let ocr_response = response.json::<OcrResponse>().await?;
-    let mut results: Vec<OcrResult> = Vec::new();
-    println!("\n--- OCR Results ---");
-    for page in ocr_response.pages {
-        // println!("{}", page.markdown);
-        let status_result = if page.markdown.contains("Upper Limit") {
-            OcrResult::DeviationFound("รูปภาพจากค่าเบี่ยงเบนความถี่".to_string())
-        } else if page.markdown.contains("OBW:") {
-            // println!("Found OBW");
-            OcrResult::OccBandWithFound("Occupied Bandwidth".to_string())
-        } else {
-            OcrResult::UnwantedFound("Unwanted Emission".to_string())
-        };
-        results.push(status_result);
-    }
-    println!("{:#?}", results);
+    // Ok(()) ต้องเป็น statement สุดท้ายของฟังก์ชันที่คืนค่า Result
     Ok(())
 }
