@@ -20,9 +20,9 @@ async fn setup_oper(driver: &WebDriver) -> Result<()> {
         .goto("https://fmr.nbtc.go.th/NBTCROS/Login.aspx")
         .await?;
     let login = driver.find(By::Id("UserName")).await?;
-    login.send_keys("puvakrint.p").await?;
+    login.send_keys("").await?;
     let password = driver.find(By::Id("Password")).await?;
-    password.send_keys("BvBHZ1rhah@28#").await?;
+    password.send_keys("").await?;
     let submit = driver.find(By::Id("bLogin")).await?;
     submit.click().await?;
     Ok(())
