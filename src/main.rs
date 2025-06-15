@@ -1,34 +1,90 @@
-// src/main.rs
-
 use anyhow::Result;
 
-// ประกาศให้ Rust รู้จักโมดูลที่เราสร้างขึ้น
 mod ocr_processor;
-// เราจะคอมเมนต์ส่วนนี้ไว้ก่อนตามโค้ดที่คุณให้มา แต่สามารถเปิดใช้ทีหลังได้
-// mod file_handler;
+// use ocr_processor::process_image;
+use std::error::Error;
+use std::time::Duration;
+use thirtyfour::prelude::*;
 
-// นำเข้าฟังก์ชันและ enum ที่เราจะใช้
-use ocr_processor::process_image;
-// use file_handler::handle_file_based_on_result;
+async fn setup_driver() -> Result<WebDriver> {
+    let caps = DesiredCapabilities::chrome();
+    let driver = WebDriver::new("http://localhost:49250", caps).await?;
+
+    println!("Driver setup completed successfully!");
+
+    Ok(driver)
+}
+
+async fn setup_oper(driver: &WebDriver) -> Result<()> {
+    driver
+        .goto("https://fmr.nbtc.go.th/NBTCROS/Login.aspx")
+        .await?;
+    let login = driver.find(By::Id("UserName")).await?;
+    login.send_keys("puvakrint.p").await?;
+    let password = driver.find(By::Id("Password")).await?;
+    password.send_keys("BvBHZ1rhah@28#").await?;
+    let submit = driver.find(By::Id("bLogin")).await?;
+    submit.click().await?;
+    Ok(())
+}
+
+async fn navigate_to_fm(driver: &WebDriver) -> Result<()> {
+    let click_oper_box = driver
+        .query(By::Css("a.nbtcros-sectionpage--item[onclick*='Oper']"))
+        .single()
+        .await?;
+    click_oper_box.wait_until().clickable().await?;
+    click_oper_box.click().await?;
+
+    let menu_items = driver
+        .query(By::XPath("//a[contains(text(), 'งานตรวจสอบคลื่นความถี่')]"))
+        .single()
+        .await?;
+
+    menu_items.wait_until().clickable().await?;
+    menu_items.click().await?;
+
+    let submenu_locator = By::XPath("//a[contains(text(), '4.การตรวจสอบมาตรฐานการแพร่')]");
+    let submenu_item = menu_items.query(submenu_locator).single().await?;
+
+    submenu_item.wait_until().clickable().await?;
+    submenu_item.click().await?;
+
+    let submenu_item_2 = driver
+        .query(By::LinkText("การตรวจสอบมาตรฐานการแพร่"))
+        .single()
+        .await?;
+
+    submenu_item_2.wait_until().clickable().await?;
+    submenu_item_2.click().await?;
+
+    let click_box_add = driver.query(By::Css(".iso-icon--plus")).single().await?;
+    click_box_add.click().await?;
+
+    Ok(())
+}
+
+// async fn automate_fm
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // โหลด .env file
-    dotenvy::dotenv().ok();
+    // dotenvy::dotenv().ok();
 
-    // 1. กำหนดไฟล์ที่จะประมวลผล
-    let image_path = "../855.png";
-    println!("Processing image: {}", image_path);
+    // let image_path = "../855.png";
+    // println!("Processing image: {}", image_path);
 
-    // 2. เรียกใช้โมดูล OCR เพื่อรับผลลัพธ์
-    // `.await` ใช้ได้เพราะ `process_image` เป็น `async`
-    let ocr_result = process_image(image_path).await?;
-    println!("OCR Result determined: {:?}", ocr_result);
+    // let ocr_result = process_image(image_path).await?;
+    // println!("OCR Result determined: {:?}", ocr_result);
 
-    // คุณสามารถเพิ่มโค้ดเพื่อจัดการกับ ocr_result ตรงนี้ได้เลย
+    // println!("\nProcess completed successfully!");
 
-    println!("\nProcess completed successfully!");
+    //implement automate browser
+    let driver = setup_driver().await?;
+    setup_oper(&driver).await?;
+    navigate_to_fm(&driver).await?;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-    // Ok(()) ต้องเป็น statement สุดท้ายของฟังก์ชันที่คืนค่า Result
+    driver.quit().await?;
+
     Ok(())
 }
