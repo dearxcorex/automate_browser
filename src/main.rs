@@ -1,5 +1,6 @@
 use anyhow::Result;
-
+use dotenvy; // Add this import for dotenvy
+use std::env;
 mod ocr_processor;
 // use ocr_processor::process_image;
 use std::error::Error;
@@ -8,7 +9,7 @@ use thirtyfour::prelude::*;
 
 async fn setup_driver() -> Result<WebDriver> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:49250", caps).await?;
+    let driver = WebDriver::new("http://localhost:50287", caps).await?;
 
     println!("Driver setup completed successfully!");
 
@@ -16,13 +17,16 @@ async fn setup_driver() -> Result<WebDriver> {
 }
 
 async fn setup_oper(driver: &WebDriver) -> Result<()> {
+    let username_nbtc = env::var("NBTC_USERNAME").expect("NBTC_USERNAME not set");
+    let password_nbtc = env::var("NBTC_PASSWORD").expect("NBTC_PASSWORD not set");
     driver
         .goto("https://fmr.nbtc.go.th/NBTCROS/Login.aspx")
         .await?;
     let login = driver.find(By::Id("UserName")).await?;
-    login.send_keys("").await?;
+    login.send_keys(&username_nbtc).await?;
+
     let password = driver.find(By::Id("Password")).await?;
-    password.send_keys("").await?;
+    password.send_keys(&password_nbtc).await?;
     let submit = driver.find(By::Id("bLogin")).await?;
     submit.click().await?;
     Ok(())
@@ -64,13 +68,25 @@ async fn navigate_to_fm(driver: &WebDriver) -> Result<()> {
     Ok(())
 }
 
-// async fn automate_fm
+async fn automate_fm(driver: &WebDriver) -> Result<()> {
+ 
+    let search_box = driver
+    .query(By::Css("button.btn.btn-primary.x-add"))
+    .with_text("ค้นหา")
+    .single()
+    .await?; 
+
+    search_box.click().await?;
+    
+
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // dotenvy::dotenv().ok();
+    dotenvy::dotenv().ok();
 
-    // let image_path = "../855.png";
+    // let image_path = "797.png";
     // println!("Processing image: {}", image_path);
 
     // let ocr_result = process_image(image_path).await?;
@@ -82,6 +98,8 @@ async fn main() -> Result<()> {
     let driver = setup_driver().await?;
     setup_oper(&driver).await?;
     navigate_to_fm(&driver).await?;
+    
+    automate_fm(&driver).await?;
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     driver.quit().await?;
