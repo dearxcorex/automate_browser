@@ -9,7 +9,7 @@ use thirtyfour::prelude::*;
 
 async fn setup_driver() -> Result<WebDriver> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:50287", caps).await?;
+    let driver = WebDriver::new("http://localhost:64817", caps).await?;
 
     println!("Driver setup completed successfully!");
 
@@ -58,10 +58,8 @@ async fn navigate_to_fm(driver: &WebDriver) -> Result<()> {
         .query(By::LinkText("การตรวจสอบมาตรฐานการแพร่"))
         .single()
         .await?;
-
     submenu_item_2.wait_until().clickable().await?;
     submenu_item_2.click().await?;
-
     let click_box_add = driver.query(By::Css(".iso-icon--plus")).single().await?;
     click_box_add.click().await?;
 
@@ -69,15 +67,29 @@ async fn navigate_to_fm(driver: &WebDriver) -> Result<()> {
 }
 
 async fn automate_fm(driver: &WebDriver) -> Result<()> {
- 
     let search_box = driver
-    .query(By::Css("button.btn.btn-primary.x-add"))
-    .with_text("ค้นหา")
-    .single()
-    .await?; 
+        .query(By::Css("button.btn.btn-primary.x-add"))
+        .with_text("ค้นหา")
+        .single()
+        .await?;
 
     search_box.click().await?;
-    
+
+    //model popup
+    let search_model = driver
+        .query(By::ClassName("modal-content"))
+        .single()
+        .await?;
+    let iframe = &search_model
+        .query(By::Tag("iframe"))
+        .wait(Duration::from_secs(10), Duration::from_secs(300))
+        .single()
+        .await?;
+
+    iframe.clone().enter_frame().await?;
+
+    let station_type = driver.find(By::Id("StnTypeID")).await?;
+    let select_element = station_type.is_selected().await?;
 
     Ok(())
 }
@@ -98,7 +110,7 @@ async fn main() -> Result<()> {
     let driver = setup_driver().await?;
     setup_oper(&driver).await?;
     navigate_to_fm(&driver).await?;
-    
+
     automate_fm(&driver).await?;
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
