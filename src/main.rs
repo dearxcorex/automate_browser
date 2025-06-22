@@ -6,10 +6,11 @@ mod ocr_processor;
 use std::error::Error;
 use std::time::Duration;
 use thirtyfour::prelude::*;
+use thirtyfour::components::SelectElement;
 
 async fn setup_driver() -> Result<WebDriver> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:64817", caps).await?;
+    let driver = WebDriver::new("http://localhost:49766", caps).await?;
 
     println!("Driver setup completed successfully!");
 
@@ -89,8 +90,11 @@ async fn automate_fm(driver: &WebDriver) -> Result<()> {
     iframe.clone().enter_frame().await?;
 
     let station_type = driver.find(By::Id("StnTypeID")).await?;
-    let select_element = station_type.is_selected().await?;
 
+
+
+    let select_element = SelectElement::new(&station_type).await?;
+    select_element.select_by_exact_text("สถานีที่ต้องการตรวจสอบ").await?;
     Ok(())
 }
 
