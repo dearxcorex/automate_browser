@@ -67,7 +67,7 @@ async fn navigate_to_fm(driver: &WebDriver) -> Result<()> {
     Ok(())
 }
 
-async fn automate_fm(driver: &WebDriver) -> Result<()> {
+async fn automate_fm(driver: &WebDriver) -> Result<(),WebDriverError> {
     let search_box = driver
         .query(By::Css("button.btn.btn-primary.x-add"))
         .with_text("ค้นหา")
@@ -79,22 +79,44 @@ async fn automate_fm(driver: &WebDriver) -> Result<()> {
     //model popup
     let search_model = driver
         .query(By::ClassName("modal-content"))
+        .and_displayed()
         .single()
         .await?;
     let iframe = &search_model
         .query(By::Tag("iframe"))
-        .wait(Duration::from_secs(10), Duration::from_secs(300))
+        .and_displayed()
         .single()
         .await?;
 
     iframe.clone().enter_frame().await?;
 
+
     let station_type = driver.find(By::Id("StnTypeID")).await?;
-
-
-
     let select_element = SelectElement::new(&station_type).await?;
-    select_element.select_by_exact_text("สถานีที่ต้องการตรวจสอบ").await?;
+    select_element.select_by_index(8).await?;
+
+
+    let station_id = driver.find(By::Id("SiteCode")).await?;
+    station_id.send_keys("05520402").await?;
+
+    // search base data
+    let search_base_data = driver.find(By::Id("SrcData")).await?;
+    let select_search_base_data = SelectElement::new(&search_base_data).await?;
+    select_search_base_data.select_by_index(0).await?;
+
+
+    let click_list_fm = driver.find(By::ClassName("iso-icon--search")).await?;
+    click_list_fm.click().await?;
+
+
+    let list_fm = driver.query(By::XPath("//a[text()='1']")).single().await?;
+    list_fm.wait_until().clickable().await?;
+    list_fm.click().await?;
+
+
+    //exit frame
+    driver.enter_parent_frame().await?;
+
     Ok(())
 }
 
