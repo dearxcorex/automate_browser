@@ -6,12 +6,11 @@ mod ocr_processor;
 use std::error::Error;
 use std::time::Duration;
 use thirtyfour::{components::SelectElement, prelude::*};
-
-use serde_json::to_value;
+use serde_json::Value as JsonValue; 
 
 async fn setup_driver() -> Result<WebDriver> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:64453", caps).await?;
+    let driver = WebDriver::new("http://localhost:50269", caps).await?;
 
     println!("Driver setup completed successfully!");
 
@@ -68,6 +67,17 @@ async fn navigate_to_fm(driver: &WebDriver) -> Result<()> {
     Ok(())
 }
 
+
+async fn open_panel(driver: &WebDriver, idx: u8) -> WebDriverResult<()> {
+    let selector = format!("p[href='#collapse_panel_{}']", idx);
+    let elem = driver.find(By::Css(&selector)).await?;
+ 
+    elem.scroll_into_view().await?;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    elem.click().await?;
+    Ok(())
+}
+
 async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
     let search_box = driver
         .query(By::Css("button.btn.btn-primary.x-add"))
@@ -113,11 +123,26 @@ async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
     //exit frame
     driver.enter_parent_frame().await?;
 
-    // toggle and scroll into view
+    // toggle and scroll into view 
 
-    let toggle_detail_station_1 = driver.find(By::Css("p[href='#collapse_panel_1']")).await?;
-    toggle_detail_station_1.click().await?;
+    for i in 1..=4 {
+        println!("Opening panel {}", i);
+        open_panel(&driver, i).await?;
+    }
+    // let toggle_detail_station_1 = driver.find(By::Css("p[href='#collapse_panel_1']")).await?;
+    // toggle_detail_station_1.scroll_into_view().await?;
+    // toggle_detail_station_1.click().await?;
+    // let toggle_detail_station_2 = driver.find(By::Css("p[href='#collapse_panel_2']")).await?;
+    // toggle_detail_station_2.scroll_into_view().await?;
+    // toggle_detail_station_2.click().await?;
+    // let toggle_detail_station_3 = driver.find(By::Css("p[href='#collapse_panel_3']")).await?;
+    // toggle_detail_station_3.scroll_into_view().await?;
+    // toggle_detail_station_3.click().await?;
 
+    // let toggle_detail_station_4 = driver.find(By::Css("p[href='#collapse_panel_4']")).await?;
+    // toggle_detail_station_4.scroll_into_view().await?;
+    // toggle_detail_station_4.click().await?;
+    
     Ok(())
 }
 
