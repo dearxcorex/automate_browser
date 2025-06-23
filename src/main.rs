@@ -71,7 +71,6 @@ async fn navigate_to_fm(driver: &WebDriver) -> Result<()> {
 async fn open_panel(driver: &WebDriver, idx: u8) -> WebDriverResult<()> {
     let selector = format!("p[href='#collapse_panel_{}']", idx);
     let elem = driver.find(By::Css(&selector)).await?;
- 
     elem.scroll_into_view().await?;
     tokio::time::sleep(Duration::from_millis(500)).await;
     elem.click().await?;
@@ -129,20 +128,12 @@ async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
         println!("Opening panel {}", i);
         open_panel(&driver, i).await?;
     }
-    // let toggle_detail_station_1 = driver.find(By::Css("p[href='#collapse_panel_1']")).await?;
-    // toggle_detail_station_1.scroll_into_view().await?;
-    // toggle_detail_station_1.click().await?;
-    // let toggle_detail_station_2 = driver.find(By::Css("p[href='#collapse_panel_2']")).await?;
-    // toggle_detail_station_2.scroll_into_view().await?;
-    // toggle_detail_station_2.click().await?;
-    // let toggle_detail_station_3 = driver.find(By::Css("p[href='#collapse_panel_3']")).await?;
-    // toggle_detail_station_3.scroll_into_view().await?;
-    // toggle_detail_station_3.click().await?;
 
-    // let toggle_detail_station_4 = driver.find(By::Css("p[href='#collapse_panel_4']")).await?;
-    // toggle_detail_station_4.scroll_into_view().await?;
-    // toggle_detail_station_4.click().await?;
-    
+    //write data fm detail panel
+    let fm_detail_panel = driver.find(By::Id("DetAnt")).await?;
+    let select_element = SelectElement::new(&fm_detail_panel).await?;
+    select_element.select_by_index(1).await?;
+      
     Ok(())
 }
 
