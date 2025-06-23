@@ -5,12 +5,13 @@ mod ocr_processor;
 // use ocr_processor::process_image;
 use std::error::Error;
 use std::time::Duration;
-use thirtyfour::prelude::*;
-use thirtyfour::components::SelectElement;
+use thirtyfour::{components::SelectElement, prelude::*};
+
+use serde_json::to_value;
 
 async fn setup_driver() -> Result<WebDriver> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:49766", caps).await?;
+    let driver = WebDriver::new("http://localhost:64453", caps).await?;
 
     println!("Driver setup completed successfully!");
 
@@ -67,7 +68,7 @@ async fn navigate_to_fm(driver: &WebDriver) -> Result<()> {
     Ok(())
 }
 
-async fn automate_fm(driver: &WebDriver) -> Result<(),WebDriverError> {
+async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
     let search_box = driver
         .query(By::Css("button.btn.btn-primary.x-add"))
         .with_text("ค้นหา")
@@ -90,11 +91,9 @@ async fn automate_fm(driver: &WebDriver) -> Result<(),WebDriverError> {
 
     iframe.clone().enter_frame().await?;
 
-
     let station_type = driver.find(By::Id("StnTypeID")).await?;
     let select_element = SelectElement::new(&station_type).await?;
     select_element.select_by_index(8).await?;
-
 
     let station_id = driver.find(By::Id("SiteCode")).await?;
     station_id.send_keys("05520402").await?;
@@ -104,18 +103,20 @@ async fn automate_fm(driver: &WebDriver) -> Result<(),WebDriverError> {
     let select_search_base_data = SelectElement::new(&search_base_data).await?;
     select_search_base_data.select_by_index(0).await?;
 
-
     let click_list_fm = driver.find(By::ClassName("iso-icon--search")).await?;
     click_list_fm.click().await?;
-
 
     let list_fm = driver.query(By::XPath("//a[text()='1']")).single().await?;
     list_fm.wait_until().clickable().await?;
     list_fm.click().await?;
 
-
     //exit frame
     driver.enter_parent_frame().await?;
+
+    // toggle and scroll into view
+
+    let toggle_detail_station_1 = driver.find(By::Css("p[href='#collapse_panel_1']")).await?;
+    toggle_detail_station_1.click().await?;
 
     Ok(())
 }
