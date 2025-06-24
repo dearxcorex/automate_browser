@@ -148,11 +148,51 @@ async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
 
     //select Ant type
     let dropdown_ant_type = driver.find(By::Id("AntID")).await?;
-    let select_element = SelectElement::new(&dropdown_ant_type).await?;
-    // select_elemen
-    let first_text = select_element.first_selected_option().await?;
+    let select_ant_type = SelectElement::new(&dropdown_ant_type).await?;
+
+    let first_text = select_ant_type.first_selected_option().await?;
     let get_text = first_text.text().await?;
+    get_text.trim().to_string();
+
+    if &get_text == "กรุณาเลือก" {
+        select_ant_type.select_by_index(1).await?;
+    }
     println!("{:?}", get_text);
+
+    //cable
+    let cable_type = driver.find(By::Id("CableID")).await?;
+    let select_cable_type = SelectElement::new(&cable_type).await?;
+    select_cable_type.select_by_index(5).await?;
+
+    //power
+    let fm_power = driver.find(By::Id("DetPow")).await?;
+    let power_value = fm_power.attr("value").await.unwrap();
+
+    if let Some(value_string) = power_value {
+        if value_string.trim().is_empty() {
+            fm_power.send_keys("500").await?;
+        }
+    }
+    //gain
+    let fm_gain = driver.find(By::Id("DetDBI")).await?;
+    let gain_value = fm_gain.attr("value").await.unwrap();
+
+    if let Some(value_string) = gain_value {
+        if value_string.trim().is_empty() {
+            fm_gain.send_keys("6").await?;
+        }
+    }
+
+    //hight
+
+    let hight = driver.find(By::Id("DetAntHeight")).await?;
+    let hight_value = hight.attr("value").await.unwrap();
+    if let Some(value_string) = hight_value {
+        if value_string.trim().is_empty() {
+            hight.send_keys("60").await?;
+        }
+    }
+    //panel 2
 
     Ok(())
 }
