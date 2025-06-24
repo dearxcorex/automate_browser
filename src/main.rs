@@ -3,14 +3,14 @@ use dotenvy; // Add this import for dotenvy
 use std::env;
 mod ocr_processor;
 // use ocr_processor::process_image;
+use serde_json::Value as JsonValue;
 use std::error::Error;
 use std::time::Duration;
 use thirtyfour::{components::SelectElement, prelude::*};
-use serde_json::Value as JsonValue; 
 
 async fn setup_driver() -> Result<WebDriver> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:50269", caps).await?;
+    let driver = WebDriver::new("http://localhost:59576", caps).await?;
 
     println!("Driver setup completed successfully!");
 
@@ -67,7 +67,6 @@ async fn navigate_to_fm(driver: &WebDriver) -> Result<()> {
     Ok(())
 }
 
-
 async fn open_panel(driver: &WebDriver, idx: u8) -> WebDriverResult<()> {
     let selector = format!("p[href='#collapse_panel_{}']", idx);
     let elem = driver.find(By::Css(&selector)).await?;
@@ -122,7 +121,7 @@ async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
     //exit frame
     driver.enter_parent_frame().await?;
 
-    // toggle and scroll into view 
+    // toggle and scroll into view
 
     for i in 1..=4 {
         println!("Opening panel {}", i);
@@ -133,7 +132,28 @@ async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
     let fm_detail_panel = driver.find(By::Id("DetAnt")).await?;
     let select_element = SelectElement::new(&fm_detail_panel).await?;
     select_element.select_by_index(1).await?;
-      
+
+    let fm_ant_panel = driver.find(By::Id("DetAerial")).await?;
+    let select_ant = SelectElement::new(&fm_ant_panel).await?;
+
+    select_ant.select_by_index(1).await?;
+
+    //get text freq fm
+    let get_feq_1 = driver.query(By::Id("FreqMhz")).single().await?;
+    let freq_text = get_feq_1.text().await.unwrap();
+    let trimmed_freq_text = freq_text.trim().to_string();
+
+    let freq_input = driver.query(By::Id("DetFrq")).single().await?;
+    freq_input.send_keys(&trimmed_freq_text).await?;
+
+    //select Ant type
+    let dropdown_ant_type = driver.find(By::Id("AntID")).await?;
+    let select_element = SelectElement::new(&dropdown_ant_type).await?;
+    // select_elemen
+    let first_text = select_element.first_selected_option().await?;
+    let get_text = first_text.text().await?;
+    println!("{:?}", get_text);
+
     Ok(())
 }
 
