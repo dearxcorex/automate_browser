@@ -12,7 +12,7 @@ use std::fs;
 struct DocumentRequest {
     #[serde(rename = "type")]
     doc_type: &'static str,
-    image: String, // We use String because we need to build the data URI
+    image_url: String, // We use String because we need to build the data URI
 }
 
 #[derive(Serialize)]
@@ -57,7 +57,7 @@ pub async fn process_image(image_path: &str) -> Result<OcrResult> {
         model: "mistral-ocr-latest",
         document: DocumentRequest {
             doc_type: "image_url",
-            image: data_uri,
+            image_url: data_uri,
         },
         include_image_base64: false,
     };

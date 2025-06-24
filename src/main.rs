@@ -2,7 +2,7 @@ use anyhow::Result;
 use dotenvy; // Add this import for dotenvy
 use std::env;
 mod ocr_processor;
-// use ocr_processor::process_image;
+use ocr_processor::process_image;
 use serde_json::Value as JsonValue;
 use std::error::Error;
 use std::time::Duration;
@@ -10,7 +10,7 @@ use thirtyfour::{components::SelectElement, prelude::*};
 
 async fn setup_driver() -> Result<WebDriver> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:59576", caps).await?;
+    let driver = WebDriver::new("http://localhost:49332", caps).await?;
 
     println!("Driver setup completed successfully!");
 
@@ -76,6 +76,20 @@ async fn open_panel(driver: &WebDriver, idx: u8) -> WebDriverResult<()> {
     Ok(())
 }
 
+async fn get_modal_iframe(driver: &WebDriver) -> WebDriverResult<WebElement> {
+    let search_model = driver
+        .query(By::ClassName("modal-content"))
+        .and_displayed()
+        .single()
+        .await?;
+    let iframe = search_model
+        .query(By::Tag("iframe"))
+        .and_displayed()
+        .single()
+        .await?;
+    Ok(iframe)
+}
+
 async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
     let search_box = driver
         .query(By::Css("button.btn.btn-primary.x-add"))
@@ -85,18 +99,7 @@ async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
 
     search_box.click().await?;
 
-    //model popup
-    let search_model = driver
-        .query(By::ClassName("modal-content"))
-        .and_displayed()
-        .single()
-        .await?;
-    let iframe = &search_model
-        .query(By::Tag("iframe"))
-        .and_displayed()
-        .single()
-        .await?;
-
+    let iframe = get_modal_iframe(&driver).await?;
     iframe.clone().enter_frame().await?;
 
     let station_type = driver.find(By::Id("StnTypeID")).await?;
@@ -192,7 +195,36 @@ async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
             hight.send_keys("60").await?;
         }
     }
-    //panel 2
+
+    Ok(())
+}
+
+async fn panel_2(driver: &WebDriver) -> Result<()> {
+    
+   for i in 1..=3 {
+     
+    let panel_2 = driver.query(By::Css("button[onclick='editFqItem(0)']")).single().await?;
+    panel_2.click().await?;
+    let iframe = get_modal_iframe(&driver).await?;
+    iframe.clone().enter_frame().await?;
+
+    let dropdown_patt = driver.find(By::Id("DiffPara")).await?;
+    let select_element = SelectElement::new(&dropdown_patt).await?;
+    select_element.select_by_index(i).await?; 
+
+    let result_dropdown_patt = driver.find(By::Id("DiffRes")).await?; 
+    let select_dropdown_patt = SelectElement::new(&result_dropdown_patt).await?;
+    select_dropdown_patt.select_by_index(1).await?;
+
+    //save 
+    let save = driver.find(By::Css("button.btn.btn-primary i.iso-icon--save")).await?; 
+    save.click().await?; 
+
+    //exit frame
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    driver.enter_parent_frame().await?;
+
+   }
 
     Ok(())
 }
@@ -201,13 +233,13 @@ async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
 
-    // let image_path = "797.png";
-    // println!("Processing image: {}", image_path);
+    let image_path = "/Users/deardevx/Documents/my_stufF/rust_for_noob/automation_browser/src/796.png";
+    println!("Processing image: {}", image_path);
 
-    // let ocr_result = process_image(image_path).await?;
-    // println!("OCR Result determined: {:?}", ocr_result);
+    let ocr_result = process_image(image_path).await?;
+    println!("OCR Result determined: {:?}", ocr_result);
 
-    // println!("\nProcess completed successfully!");
+    println!("\nProcess completed successfully!");
 
     //implement automate browser
     let driver = setup_driver().await?;
@@ -215,6 +247,7 @@ async fn main() -> Result<()> {
     navigate_to_fm(&driver).await?;
 
     automate_fm(&driver).await?;
+    panel_2(&driver).await?;
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     driver.quit().await?;
