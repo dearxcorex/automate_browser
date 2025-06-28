@@ -1,12 +1,11 @@
 use anyhow::Result;
-use dotenvy; // Add this import for dotenvy
+use dotenvy;
 use std::env;
-use std::fs;
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 mod ocr_processor;
-use ocr_processor::process_image;
-use serde_json::Value as JsonValue;
-use std::error::Error;
+use ocr_processor::{process_image};
 use std::time::Duration;
 use thirtyfour::{components::SelectElement, prelude::*};
 
@@ -234,32 +233,70 @@ async fn panel_2(driver: &WebDriver) -> Result<()> {
 }
 
 //upload image and process it
-async fn panel_3(driver: &WebDriver,image_path:&str) -> Result<()> {
+async fn panel_3(driver: &WebDriver, image_paths: &[PathBuf]) -> Result<()> {
+    let panel_3_content = driver.find(By::Id("collapse_panel_3")).await?;
 
-    
-    let panel_3 = driver.find(By::Id("collapse_panel_3")).await?;
-    panel_3.scroll_into_view().await?;
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    let click_panel_3 = panel_3.find(By::Css("button[onclick='editItem(0)']")).await?; 
-    click_panel_3.click().await?;
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    for (index, image_path_buf) in image_paths.iter().enumerate() {
+        let image_path = image_path_buf.to_str().unwrap_or_default();
+        if image_path.is_empty() {
+            continue;
+        }
 
+        println!("  > Uploading image {} of {}: {}", index + 1, image_paths.len(), image_path);
 
-    let iframe = get_modal_iframe(&driver).await?;
-    iframe.clone().enter_frame().await?;
+        // Find and click the "Add" (เพิ่ม) button inside the third panel.
+        // This should open the modal for a new image upload.
+        let add_button = panel_3_content.find(By::Css("button.btn.btn-primary.x-add")).await?;
+        add_button.click().await?;
+        tokio::time::sleep(Duration::from_millis(1000)).await;
 
-    //upload image
-    let upload_button = driver.find(By::Id("File1")).await?;
-    upload_button.send_keys(image_path).await?;
+        let iframe = get_modal_iframe(&driver).await?;
+        iframe.clone().enter_frame().await?;
 
-    //process image
-    // let ocr_result = process_image("/path/to/your/image.png").await?;
-    // println!("OCR Result: {:?}", ocr_result);
+        // --- Start of modal logic ---
+        let upload_button = driver.find(By::Id("File1")).await?;
+        upload_button.send_keys(image_path).await?;
 
+        let image_type = driver.find(By::Id("PicTypeID")).await?;
+        let select_image_type = SelectElement::new(&image_type).await?;
+
+        let ocr_result_enum = process_image(image_path).await?;
+        println!("    OCR Result: {:?}", ocr_result_enum);
+
+        let ocr_text = match ocr_result_enum {
+            ocr_processor::OcrResult::Deviation(s)
+            | ocr_processor::OcrResult::OccBandwidth(s)
+            | ocr_processor::OcrResult::Unwanted(s) => s,
+        };
+
+        if ocr_text.contains("Deviation") {
+            select_image_type.select_by_index(2).await?;
+        } else if ocr_text.contains("Occupied Bandwidth") {
+            select_image_type.select_by_index(2).await?;
+
+        } else if ocr_text.contains("Unwanted") {
+            select_image_type.select_by_index(2).await?;
+        } else {
+            select_image_type.select_by_index(6).await?;
+        }
+
+        let description = driver.find(By::Id("Remark")).await?;
+        description.send_keys(&ocr_text).await?;
+
+        let save_button = driver.find(By::Css("button.btn.btn-primary i.iso-icon--save")).await?;
+        save_button.click().await?;
+
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+        driver.enter_parent_frame().await?;
+        // --- End of modal logic ---
+
+        println!("    Successfully added image.");
+        // Wait a moment for the UI to be ready for the next "Add" click.
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+    }
 
     Ok(())
 }
-
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -267,47 +304,50 @@ async fn main() -> Result<()> {
     let driver = setup_driver().await?;
     setup_oper(&driver).await?;
     let image_path = "/Users/deardevx/Documents/my_stufF/rust_for_noob/automation_browser/src/picture/";
+    let picture_dir = Path::new(image_path);
 
-    for entry in fs::read_dir(image_path)?{
-        let entry = entry?;
-        let image_path_buf = entry.path();
+    // 1. Group image paths by station ID (parent directory name)
+    let mut station_images: HashMap<String, Vec<PathBuf>> = HashMap::new();
 
-        if image_path_buf.is_file(){
-            let image_path = image_path_buf.to_str().unwrap_or_default();
+    for entry in WalkDir::new(picture_dir).into_iter().filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(parent) = path.parent() {
+                if let Some(station_id_os) = parent.file_name() {
+                    if let Some(station_id) = station_id_os.to_str() {
+                        // Skip files directly in the 'picture' root or hidden files
+                        if station_id == "picture" || station_id.starts_with('.') {
+                            continue;
+                        }
+                        if entry.file_name().to_str().map_or(false, |s| s.starts_with('.')) {
+                            continue;
+                        }
 
-            let station_id = image_path_buf
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or_default();
-
-        if station_id.is_empty() {
-            eprintln!("Error: Station ID is empty for file: {}", image_path);
-            continue;
-        }
-
-        println!("#Starting procressinng For Station ID: {}", station_id);
-        println!("Processing image: {}", image_path);
-
-        let ocr_result = process_image(image_path).await?;
-        println!("OCR Result determined: {:?}", ocr_result);
-
-        navigate_to_fm(&driver).await?;
-        automate_fm(&driver, station_id).await?;
-        panel_2(&driver).await?;
-        panel_3(&driver, image_path).await?;
-        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-        println!("\nProcess completed successfully for Station ID: {}", station_id);
+                        station_images
+                            .entry(station_id.to_string())
+                            .or_default()
+                            .push(path.to_path_buf());
+                    }
+                }
+            }
         }
     }
 
-    // let ocr_result = process_image(image_path).await?;
-    // println!("OCR Result determined: {:?}", ocr_result);
+    // 2. Loop through each station and its collected images
+    for (station_id, image_paths) in station_images {
+        println!("\n# Starting processing for Station ID: {}", station_id);
+        println!("  Found {} image(s) to process.", image_paths.len());
 
-    // println!("\nProcess completed successfully!");
+        navigate_to_fm(&driver).await?;
+        automate_fm(&driver, &station_id).await?;
+        panel_2(&driver).await?;
+        panel_3(&driver, &image_paths).await?;
 
-    //implement automate brows    driver.quit().await?;
+        println!("# Finished processing for Station ID: {}", station_id);
+    }
+
+    println!("\nAll files processed successfully!");
+    driver.quit().await?;
 
     Ok(())
-
-
 }
