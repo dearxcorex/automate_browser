@@ -1,6 +1,8 @@
 use anyhow::Result;
 use dotenvy; // Add this import for dotenvy
 use std::env;
+use std::fs;
+use std::path::Path;
 mod ocr_processor;
 use ocr_processor::process_image;
 use serde_json::Value as JsonValue;
@@ -10,7 +12,7 @@ use thirtyfour::{components::SelectElement, prelude::*};
 
 async fn setup_driver() -> Result<WebDriver> {
     let caps = DesiredCapabilities::chrome();
-    let driver = WebDriver::new("http://localhost:49332", caps).await?;
+    let driver = WebDriver::new("http://localhost:49374", caps).await?;
 
     println!("Driver setup completed successfully!");
 
@@ -90,7 +92,7 @@ async fn get_modal_iframe(driver: &WebDriver) -> WebDriverResult<WebElement> {
     Ok(iframe)
 }
 
-async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
+async fn automate_fm(driver: &WebDriver,station_id: &str) -> Result<(), WebDriverError> {
     let search_box = driver
         .query(By::Css("button.btn.btn-primary.x-add"))
         .with_text("ค้นหา")
@@ -106,8 +108,8 @@ async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
     let select_element = SelectElement::new(&station_type).await?;
     select_element.select_by_index(8).await?;
 
-    let station_id = driver.find(By::Id("SiteCode")).await?;
-    station_id.send_keys("05520402").await?;
+    let station_id_input = driver.find(By::Id("SiteCode")).await?;
+    station_id_input.send_keys(station_id).await?;
 
     // search base data
     let search_base_data = driver.find(By::Id("SrcData")).await?;
@@ -196,6 +198,8 @@ async fn automate_fm(driver: &WebDriver) -> Result<(), WebDriverError> {
         }
     }
 
+
+
     Ok(())
 }
 
@@ -229,28 +233,81 @@ async fn panel_2(driver: &WebDriver) -> Result<()> {
     Ok(())
 }
 
+//upload image and process it
+async fn panel_3(driver: &WebDriver,image_path:&str) -> Result<()> {
+
+    
+    let panel_3 = driver.find(By::Id("collapse_panel_3")).await?;
+    panel_3.scroll_into_view().await?;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    let click_panel_3 = panel_3.find(By::Css("button[onclick='editItem(0)']")).await?; 
+    click_panel_3.click().await?;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+
+    let iframe = get_modal_iframe(&driver).await?;
+    iframe.clone().enter_frame().await?;
+
+    //upload image
+    let upload_button = driver.find(By::Id("File1")).await?;
+    upload_button.send_keys(image_path).await?;
+
+    //process image
+    // let ocr_result = process_image("/path/to/your/image.png").await?;
+    // println!("OCR Result: {:?}", ocr_result);
+
+
+    Ok(())
+}
+
+
 #[tokio::main]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
-
-    let image_path = "/Users/deardevx/Documents/my_stufF/rust_for_noob/automation_browser/src/796.png";
-    println!("Processing image: {}", image_path);
-
-    let ocr_result = process_image(image_path).await?;
-    println!("OCR Result determined: {:?}", ocr_result);
-
-    println!("\nProcess completed successfully!");
-
-    //implement automate browser
     let driver = setup_driver().await?;
     setup_oper(&driver).await?;
-    navigate_to_fm(&driver).await?;
+    let image_path = "/Users/deardevx/Documents/my_stufF/rust_for_noob/automation_browser/src/picture/";
 
-    automate_fm(&driver).await?;
-    panel_2(&driver).await?;
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    for entry in fs::read_dir(image_path)?{
+        let entry = entry?;
+        let image_path_buf = entry.path();
 
-    driver.quit().await?;
+        if image_path_buf.is_file(){
+            let image_path = image_path_buf.to_str().unwrap_or_default();
+
+            let station_id = image_path_buf
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default();
+
+        if station_id.is_empty() {
+            eprintln!("Error: Station ID is empty for file: {}", image_path);
+            continue;
+        }
+
+        println!("#Starting procressinng For Station ID: {}", station_id);
+        println!("Processing image: {}", image_path);
+
+        let ocr_result = process_image(image_path).await?;
+        println!("OCR Result determined: {:?}", ocr_result);
+
+        navigate_to_fm(&driver).await?;
+        automate_fm(&driver, station_id).await?;
+        panel_2(&driver).await?;
+        panel_3(&driver, image_path).await?;
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+        println!("\nProcess completed successfully for Station ID: {}", station_id);
+        }
+    }
+
+    // let ocr_result = process_image(image_path).await?;
+    // println!("OCR Result determined: {:?}", ocr_result);
+
+    // println!("\nProcess completed successfully!");
+
+    //implement automate brows    driver.quit().await?;
 
     Ok(())
+
+
 }

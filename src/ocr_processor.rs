@@ -81,7 +81,7 @@ pub async fn process_image(image_path: &str) -> Result<OcrResult> {
     println!("\n--- OCR Results ---");
     if let Some(first_page) = ocr_response.pages.first() {
         if first_page.markdown.contains("Upper Limit") {
-            Ok(OcrResult::Deviation("รูปภาพจากค่าเบี่ยงเบนความถี่".to_string()))
+            Ok(OcrResult::Deviation("Deviation".to_string()))
         } else if first_page.markdown.contains("OBW:") {
             Ok(OcrResult::OccBandwidth("Occupied Bandwidth".to_string()))
         } else {
@@ -91,3 +91,4 @@ pub async fn process_image(image_path: &str) -> Result<OcrResult> {
         Ok(OcrResult::Unwanted("No text found".to_string()))
     }
 }
+
