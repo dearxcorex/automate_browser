@@ -68,6 +68,7 @@ dependencies = [
  "anyhow",
  "base64",
  "dotenvy",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
